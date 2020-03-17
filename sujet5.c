@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "rdtsc.h"
+#include "common.h"
+
 
 void initVect(float** t);
 void initMat(float*** m, unsigned long n);
@@ -16,39 +18,79 @@ void ram (unsigned n, float** m, float * x, float * y);
 int main(int nbarg, char *argv[])
 {
 	//Listing.1 – Code de réduction d’un tableau
-	unsigned long long cb,ca;
-  unsigned long n = atol(argv[1]);
-  float * x=(float*)malloc(n*sizeof(float));
-  float * y=NULL;
-  float ** m=NULL;
+		int r,t;
+		f64 cycles[MAX_SAMPLES];
+		u64 samples_count = 0,cb,ca;
+	  unsigned long n = atol(argv[1]);
+		unsigned long repw = 100;
+		unsigned long repm = 100;
 
-  //printf("%ld\n",sizeof(float)); //sizeof(float) = 4
-  //Initialisation des tableaux
-  initVect(&y);
-  initMat(&m, n);
+		for ( t= 0; t < 31; t++) {
 
-  // Premier relevé de temps
-  cb = rdtsc();
-  //appel baseline
-	#if BASELINE
-  	baseline(n, m, x, y);
-	#endif
-	#if L1
-		l1(n, m, x, y);
-	#endif
-	#if L2
-		l2(n, m, x, y);
-	#endif
-	#if L3
-		l3(n, m, x, y);
-	#endif
-	#if RAM
-		ram(n, m, x, y);
-	#endif
-  //Deuxième relevé de temps
-  ca = rdtsc();
-  printf("%lld\n",(ca-cb));
-	return 0;
+		  float * x=(float*)malloc(n*sizeof(float));
+		  float * y=NULL;
+		  float ** m=NULL;
+
+		  //printf("%ld\n",sizeof(float)); //sizeof(float) = 4
+		  //Initialisation des tableaux
+		  initVect(&y);
+		  initMat(&m, n);
+
+			for (r  = 0;  r<repw; r ++) {
+				baseline(n, m, x, y);
+			}
+
+		  // Premier relevé de temps
+		  cb = rdtsc();
+		  //appel baseline
+	  	for (r = 0; r < repm; r++) {
+	  		baseline(n, m, x, y);
+	  	}
+		  //Deuxième relevé de temps
+		  ca = rdtsc();
+
+
+			free(x);
+			free(y);
+			for (r= 0; r < n; r++) {
+				free(m[r]);
+			}
+
+
+			f64 elapsed = (float)(ca - cb)/(n*n*16 *repm);
+			cycles[samples_count++] = elapsed;
+
+
+		}
+
+		sort(cycles, samples_count);
+
+	  //
+	  f64 min, max, avg, mea, dev, bpc;
+
+	  //
+	  mea = mean(cycles, samples_count);
+
+	  //
+	  dev = stddev(cycles, samples_count);
+
+	  //
+	  min = cycles[0];
+	  max = cycles[samples_count - 1];
+	  avg = (min + max) / 2.0;
+
+
+
+	  //
+	  printf("\n %15.3f; %15.3f; %15.3f; %15.3f; %15.3f %%; %15.3f %%;\n",
+		  min,
+		  max,
+		  avg,
+		  mea,
+			(avg-min)/min,
+	  	(dev * 100.0 / mea));
+
+		return 0;
 }
 
 // Initialisation du tableau
